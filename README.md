@@ -26,7 +26,7 @@ It’s not smart — it’s **DUMB**.
 
 ---
 
-## ⚙️ Installation
+## 📦 Installation
 
 ```bash
 go install github.com/YourUsername/dumb@latest
