@@ -31,7 +31,15 @@ func init() {
 	endln := flag.String("eol", eol, "line ending characters or LF/CRLF. Defaults to the OS")
 
 	parseOutputFlag := func(val string) error {
-		if val != "" {
+		switch val {
+		case "":
+			// skip
+		case "-":
+			handleOutput = func(fpath string, content []byte) error {
+				_, err := fmt.Printf("%s\n\n%s\n", magenta.Paint(fpath), content)
+				return err
+			}
+		default:
 			val = filepath.Clean(val)
 			if err := os.MkdirAll(val, 0755); err != nil {
 				return err
@@ -44,11 +52,15 @@ func init() {
 				}
 				return err
 			}
+
 		}
 		return nil
 	}
-	flag.Func("output", "specify another output directory for the files (leave blank for overwite)", parseOutputFlag)
+
+	flag.Func("output", "specify another output directory for the files (leave blank for overwite, - for stdout)", parseOutputFlag)
 	flag.Func("o", "shorthand for output", parseOutputFlag)
+
+	echo := flag.Bool("echo", false, "print output to stdout instead of writing to files")
 
 	flag.Parse()
 
@@ -60,8 +72,11 @@ func init() {
 	default:
 		eol = *endln
 	}
-}
 
+	if *echo {
+		parseOutputFlag("-")
+	}
+}
 
 func main() {
 	var (
