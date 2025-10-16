@@ -62,14 +62,6 @@ func init() {
 	}
 }
 
-/*
-	v asdpkapsdkpaskdpad
-	! sdladlmasld/saddasdas
-		-asdasdadad
-		-saddadada
-		-adadsadad
-	x asd/asd/asdad
-*/
 
 func main() {
 	var (
@@ -78,7 +70,7 @@ func main() {
 	)
 
 	if err != nil {
-		fmt.Println("ERROR:", err)
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 		return
 	}
@@ -137,8 +129,7 @@ func loadFiles() (<-chan string, error) {
 				continue
 			}
 
-			// TODO: Handle error
-			err = filepath.WalkDir(fpath, func(path string, info fs.DirEntry, e error) error {
+			filepath.WalkDir(fpath, func(path string, info fs.DirEntry, e error) error {
 				if e != nil {
 					return e
 				}
@@ -164,13 +155,14 @@ func indent(rd io.Reader, logs *[]string) string {
 	)
 
 	for ln := 1; scanner.Scan(); ln++ {
-		closing, escaped, inlineclosing := false, false, queue[rune]{}
+		closing, escaped, inlineclosing := false, false, 0
 
-		for _, ch := range strings.TrimSpace(scanner.Text()) {
+		line := strings.TrimSpace(scanner.Text())
+		for _, ch := range line {
 			txt.WriteRune(ch)
 			switch ch {
 			case '\\':
-				escaped = true
+				escaped = !escaped
 			case '(':
 				if escaped {
 					escaped = false
@@ -194,7 +186,12 @@ func indent(rd io.Reader, logs *[]string) string {
 					} else {
 						toclose = 0
 					}
-					closing = closing || inlineclosing.pop() == nil
+
+					if inlineclosing == 0 {
+						closing = true
+					} else {
+						inlineclosing--
+					}
 				}
 				continue
 			case ')', ']', '}':
@@ -208,7 +205,6 @@ func indent(rd io.Reader, logs *[]string) string {
 				} else {
 					msg = fmt.Sprintf("Mismatch bracket, closing '%c' but expected '%c', at line: %d\n", ch, toclose, ln)
 				}
-				line := txt.String()
 				*logs = append(*logs, warn(msg+caret(line, txt.Len())))
 				continue
 			default:
@@ -216,18 +212,19 @@ func indent(rd io.Reader, logs *[]string) string {
 				continue
 			}
 			brackets.push(toclose)
-			inlineclosing.push(ch)
+			inlineclosing++
 		}
 
-		if len(inlineclosing) > 0 {
+		read := txt.String()
+		if inlineclosing > 0 {
 			if closing {
 				parsed.close("")
 			}
-			parsed.open(txt.String())
+			parsed.open(read)
 		} else if closing {
-			parsed.close(txt.String())
+			parsed.close(read)
 		} else {
-			parsed.add(txt.String())
+			parsed.add(read)
 		}
 		txt.Reset()
 	}
