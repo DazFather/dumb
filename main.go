@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/DazFather/brush"
 )
 
 var (
@@ -18,6 +20,9 @@ var (
 )
 
 func init() {
+	flag.BoolVar(&brush.Disable, "no-color", false, "force disable of colored output'")
+	flag.BoolVar(&brush.Disable, "nc", false, "shorthand for 'no-color'")
+
 	flag.StringVar(&spacer, "spacer", "\t", "unit of the indentation spacer")
 	flag.StringVar(&spacer, "s", "\t", "shorthand for spacer")
 
