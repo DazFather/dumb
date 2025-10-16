@@ -15,8 +15,10 @@ import (
 )
 
 var (
-	spacer string
-	outDir string
+	spacer       string
+	handleOutput = func(fpath string, content []byte) error {
+		return os.WriteFile(fpath, content, 0666)
+	}
 )
 
 func init() {
@@ -34,7 +36,14 @@ func init() {
 			if err := os.MkdirAll(val, 0755); err != nil {
 				return err
 			}
-			outDir = val
+			handleOutput = func(fpath string, content []byte) error {
+				fpath = filepath.Join(val, fpath)
+				err := os.MkdirAll(filepath.Dir(fpath), 0755)
+				if err == nil {
+					err = os.WriteFile(fpath, content, 0666)
+				}
+				return err
+			}
 		}
 		return nil
 	}
@@ -75,34 +84,23 @@ func main() {
 	}
 
 	for fpath := range files {
-		wg.Add(2)
+		wg.Add(1)
 		go func() {
 			defer wg.Done()
 
-			logs := make(chan loggable)
-			defer close(logs)
-			go func() {
-				fmt.Println(collect(fpath, logs))
-				wg.Done()
-			}()
+			logs := []string{}
+
 			f, err := os.Open(fpath)
 			if err != nil {
-				logs <- danger(err.Error())
+				fmt.Println(collect(fpath, danger(err)))
 				return
 			}
 			defer f.Close()
 
-			if outDir != "" {
-				fpath = filepath.Join(outDir, fpath)
-				if err = os.MkdirAll(filepath.Dir(fpath), 0755); err != nil {
-					logs <- danger(err.Error())
-					return
-				}
+			if err = handleOutput(fpath, []byte(indent(f, &logs))); err != nil {
+				logs = append(logs, danger(err))
 			}
-
-			if err = os.WriteFile(fpath, []byte(indent(f, logs)), 0666); err != nil {
-				logs <- danger(err.Error())
-			}
+			fmt.Println(collect(fpath, logs...))
 		}()
 	}
 	wg.Wait()
@@ -156,7 +154,7 @@ func loadFiles() (<-chan string, error) {
 	return files, nil
 }
 
-func indent(rd io.Reader, log chan<- loggable) string {
+func indent(rd io.Reader, logs *[]string) string {
 	var (
 		scanner  = bufio.NewScanner(rd)
 		toclose  rune
@@ -211,7 +209,7 @@ func indent(rd io.Reader, log chan<- loggable) string {
 					msg = fmt.Sprintf("Mismatch bracket, closing '%c' but expected '%c', at line: %d\n", ch, toclose, ln)
 				}
 				line := txt.String()
-				log <- warn(msg + fmt.Sprintf("%s\n%*c\n", line, len(line), '^'))
+				*logs = append(*logs, warn(msg+caret(line, txt.Len())))
 				continue
 			default:
 				escaped = false
@@ -235,12 +233,12 @@ func indent(rd io.Reader, log chan<- loggable) string {
 	}
 
 	if err := scanner.Err(); err != nil {
-		log <- danger(err.Error())
+		*logs = append(*logs, danger(err))
 		return ""
 	}
 
 	if len(brackets) > 0 {
-		log <- warn("Unclosed brackets: " + string(brackets))
+		*logs = append(*logs, warn("Unclosed brackets: "+string(brackets)))
 	}
 
 	return parsed.Root().Indent(0, spacer)

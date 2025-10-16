@@ -6,34 +6,30 @@ import (
 	"github.com/DazFather/brush"
 )
 
-const (
-	dangerColor  = brush.BrightRed
-	warnColor    = brush.BrightYellow
-	successColor = brush.BrightGreen
+var (
+	red     = brush.New(brush.BrightRed, nil)
+	yellow  = brush.New(brush.BrightYellow, nil)
+	magenta = brush.New(brush.BrightMagenta, nil)
 )
 
-type loggable interface {
-	Log() string
+func caret(line string, at int) string {
+	return fmt.Sprintf("%s\n%*s%s\n", line, at-1, "", red.Paint("^"))
 }
 
-type danger string
-
-func (d danger) Log() string {
-	return fmt.Sprintln(brush.Paint(dangerColor, nil, "x"), d)
+func danger(v ...any) string {
+	return red.Paint(" x ").String() + fmt.Sprintln(v...)
 }
 
-type warn string
-
-func (w warn) Log() string {
-	return fmt.Sprintln(brush.Paint(warnColor, nil, "!"), w)
+func warn(v ...any) string {
+	return yellow.Paint(" ! ").String() + fmt.Sprintln(v...)
 }
 
-func collect(fpath string, logs <-chan loggable) string {
+func collect(fpath string, logs ...string) string {
 	var msg string
 
-	for log := range logs {
-		msg += brush.Paint(brush.BrightMagenta, nil, fpath).String() + " | " + log.Log()
+	for _, log := range logs {
+		msg += magenta.Paint(fpath).String() + " |" + log
 	}
 
-	return msg
+	return msg + "\n"
 }
