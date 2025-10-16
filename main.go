@@ -238,6 +238,8 @@ func indent(rd io.Reader, logs *[]string) string {
 			parsed.open(read)
 		} else if closing {
 			parsed.close(read)
+		} else if size := len(read); size > 1 && strings.ContainsAny(read[0:1]+read[size-1:size], `.+-\`) {
+			parsed.add(spacer + read)
 		} else {
 			parsed.add(read)
 		}
