@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -15,6 +16,7 @@ import (
 )
 
 var (
+	selfTab      = regexp.MustCompile(`^[\.+\-]|[^\.+\-][\.+\-]$`)
 	spacer       string
 	handleOutput = func(fpath string, content []byte) error {
 		return os.WriteFile(fpath, content, 0666)
@@ -22,13 +24,19 @@ var (
 )
 
 func init() {
-	flag.BoolVar(&brush.Disable, "no-color", false, "force disable of colored output'")
+	flag.BoolVar(&brush.Disable, "no-color", false, "force disable of colored output")
 	flag.BoolVar(&brush.Disable, "nc", false, "shorthand for 'no-color'")
 
 	flag.StringVar(&spacer, "spacer", "\t", "unit of the indentation spacer")
 	flag.StringVar(&spacer, "s", "\t", "shorthand for spacer")
 
 	endln := flag.String("eol", eol, "line ending characters or LF/CRLF. Defaults to the OS")
+
+	flag.Func("indent", "regexp pattern for indenting a single line", func(val string) error {
+		var err error
+		selfTab, err = regexp.Compile(val)
+		return err
+	})
 
 	parseOutputFlag := func(val string) error {
 		switch val {
@@ -195,7 +203,8 @@ func indent(rd io.Reader, logs *[]string) string {
 					escaped = false
 					continue
 				}
-				if item := brackets.pop(); item != nil {
+
+				if brackets.pop() != nil {
 					if size := len(brackets); size > 0 {
 						toclose = brackets[size-1]
 					} else {
@@ -238,7 +247,7 @@ func indent(rd io.Reader, logs *[]string) string {
 			parsed.open(read)
 		} else if closing {
 			parsed.close(read)
-		} else if size := len(read); size > 1 && strings.ContainsAny(read[0:1]+read[size-1:size], `.+-\`) {
+		} else if selfTab.MatchString(read) {
 			parsed.add(spacer + read)
 		} else {
 			parsed.add(read)
