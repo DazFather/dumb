@@ -29,7 +29,7 @@ It’s not smart — it’s **DUMB**.
 ## 📦 Installation
 
 ```bash
-go install github.com/YourUsername/dumb@latest
+go install github.com/DazFather/dumb@latest
 ```
 
 ## ⚙️ Usage
