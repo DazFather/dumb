@@ -170,11 +170,12 @@ func loadFiles() (<-chan string, error) {
 
 func indent(rd io.Reader, logs *[]string) string {
 	var (
-		scanner  = bufio.NewScanner(rd)
-		toclose  rune
-		brackets queue[rune]
-		parsed   = NewTree()
-		txt      strings.Builder
+		scanner     = bufio.NewScanner(rd)
+		toclose     rune
+		brackets    queue[rune]
+		parsed      = NewTree()
+		txt         strings.Builder
+		strenclosed bool
 	)
 
 	for ln := 1; scanner.Scan(); ln++ {
@@ -186,15 +187,22 @@ func indent(rd io.Reader, logs *[]string) string {
 			switch ch {
 			case '\\':
 				escaped = !escaped
+				continue
 			case '(':
 				if escaped {
 					escaped = false
+					continue
+				}
+				if strenclosed {
 					continue
 				}
 				toclose = ch + 1
 			case '{', '[':
 				if escaped {
 					escaped = false
+					continue
+				}
+				if strenclosed {
 					continue
 				}
 				toclose = ch + 2
@@ -216,11 +224,16 @@ func indent(rd io.Reader, logs *[]string) string {
 					} else {
 						inlineclosing--
 					}
+
+					strenclosed = toclose == '\'' || toclose == '"' || toclose == '`'
 				}
 				continue
 			case ')', ']', '}':
 				if escaped {
 					escaped = false
+					continue
+				}
+				if strenclosed {
 					continue
 				}
 				msg := ""
@@ -231,6 +244,16 @@ func indent(rd io.Reader, logs *[]string) string {
 				}
 				*logs = append(*logs, warn(msg+caret(line, txt.Len())))
 				continue
+			case '\'', '"', '`':
+				if escaped {
+					escaped = false
+					continue
+				}
+				if strenclosed {
+					continue
+				}
+				strenclosed = true
+				toclose = ch
 			default:
 				escaped = false
 				continue
