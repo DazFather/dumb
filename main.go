@@ -1,10 +1,8 @@
 package main
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -112,7 +110,7 @@ func main() {
 			}
 			defer f.Close()
 
-			if err = handleOutput(fpath, []byte(indent(f, &logs))); err != nil {
+			if err = handleOutput(fpath, []byte(Indent(f, &logs))); err != nil {
 				logs = append(logs, danger(err))
 			}
 			fmt.Println(collect(fpath, logs...))
@@ -166,126 +164,4 @@ func loadFiles() (<-chan string, error) {
 	}()
 
 	return files, nil
-}
-
-func indent(rd io.Reader, logs *[]string) string {
-	var (
-		scanner     = bufio.NewScanner(rd)
-		toclose     rune
-		brackets    queue[rune]
-		parsed      = NewTree()
-		txt         strings.Builder
-		strenclosed bool
-	)
-
-	for ln := 1; scanner.Scan(); ln++ {
-		closing, escaped, inlineclosing := false, false, 0
-
-		line := strings.TrimSpace(scanner.Text())
-		for _, ch := range line {
-			txt.WriteRune(ch)
-			switch ch {
-			case '\\':
-				escaped = !escaped
-				continue
-			case '(':
-				if escaped {
-					escaped = false
-					continue
-				}
-				if strenclosed {
-					continue
-				}
-				toclose = ch + 1
-			case '{', '[':
-				if escaped {
-					escaped = false
-					continue
-				}
-				if strenclosed {
-					continue
-				}
-				toclose = ch + 2
-			case toclose:
-				if escaped {
-					escaped = false
-					continue
-				}
-
-				if brackets.pop() != nil {
-					if size := len(brackets); size > 0 {
-						toclose = brackets[size-1]
-					} else {
-						toclose = 0
-					}
-
-					if inlineclosing == 0 {
-						closing = true
-					} else {
-						inlineclosing--
-					}
-
-					strenclosed = toclose == '\'' || toclose == '"' || toclose == '`'
-				}
-				continue
-			case ')', ']', '}':
-				if escaped {
-					escaped = false
-					continue
-				}
-				if strenclosed {
-					continue
-				}
-				msg := ""
-				if toclose == 0 {
-					msg = fmt.Sprintf("Closing unopened bracket '%c' at line: %d\n", ch, ln)
-				} else {
-					msg = fmt.Sprintf("Mismatch bracket, closing '%c' but expected '%c', at line: %d\n", ch, toclose, ln)
-				}
-				*logs = append(*logs, warn(msg+caret(line, txt.Len())))
-				continue
-			case '\'', '"', '`':
-				if escaped {
-					escaped = false
-					continue
-				}
-				if strenclosed {
-					continue
-				}
-				strenclosed = true
-				toclose = ch
-			default:
-				escaped = false
-				continue
-			}
-			brackets.push(toclose)
-			inlineclosing++
-		}
-
-		read := txt.String()
-		if inlineclosing > 0 {
-			if closing {
-				parsed.close("")
-			}
-			parsed.open(read)
-		} else if closing {
-			parsed.close(read)
-		} else if selfTab.MatchString(read) {
-			parsed.add(spacer + read)
-		} else {
-			parsed.add(read)
-		}
-		txt.Reset()
-	}
-
-	if err := scanner.Err(); err != nil {
-		*logs = append(*logs, danger(err))
-		return ""
-	}
-
-	if len(brackets) > 0 {
-		*logs = append(*logs, warn("Unclosed brackets: "+string(brackets)))
-	}
-
-	return parsed.Root().Indent(0, spacer)
 }
