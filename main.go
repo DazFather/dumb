@@ -26,7 +26,7 @@ func init() {
 	flag.BoolVar(&brush.Disable, "nc", false, "shorthand for 'no-color'")
 
 	flag.StringVar(&spacer, "spacer", "\t", "unit of the indentation spacer")
-	flag.StringVar(&spacer, "s", "\t", "shorthand for spacer")
+	flag.StringVar(&spacer, "s", "\t", "shorthand for 'spacer'")
 
 	endln := flag.String("eol", eol, "line ending characters or LF/CRLF. Defaults to the OS")
 
@@ -64,7 +64,7 @@ func init() {
 	}
 
 	flag.Func("output", "specify another output directory for the files (leave blank for overwite, - for stdout)", parseOutputFlag)
-	flag.Func("o", "shorthand for output", parseOutputFlag)
+	flag.Func("o", "shorthand for 'output'", parseOutputFlag)
 
 	echo := flag.Bool("echo", false, "print output to stdout instead of writing to files")
 
@@ -81,6 +81,15 @@ func init() {
 
 	if *echo {
 		parseOutputFlag("-")
+	}
+
+	switch strings.ToLower(flag.Arg(0)) {
+	case "h", "help":
+		flag.Usage()
+		os.Exit(0)
+	case "v", "version":
+		fmt.Println("unreleased alpha")
+		os.Exit(0)
 	}
 }
 
